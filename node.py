@@ -105,6 +105,7 @@ class InternalNode(Node):
                 return self.parent.split()
         
         return None
+    
             
 class LeafNode(Node):
     def __init__(self, b):
@@ -192,6 +193,68 @@ class BPlusTree:
             while self.root.parent is not None:
                 self.root = self.root.parent
 
+    def search(self, key):
+        findNode = self.root
+        if findNode is None:
+            return None
+
+        path = [] # 어떤 노드를 타고 내려갔는지 키를 저장하기 위한 배열이다.
+        # leaf까지 내려간다.
+        while findNode is not None and not findNode.isLeaf:
+            print(findNode.keys)
+            # 타고 내려갈 적절한 child node를 찾는다.
+            childIdx = 0
+            while childIdx < len(findNode.keys) and key > findNode.keys[childIdx]:
+                childIdx += 1
+
+            # rightmost child도 비교한다.
+            # 모든 left children들의 키들보다 찾으려는 키가 큰 경우 rightmost child로 내려간다.
+            if childIdx == len(findNode.children) and findNode.r:
+                findNode = findNode.r
+            else:
+                findNode = findNode.children[childIdx]
+        
+        # 도달한 leaf node 안에서 해당 키가 존재하는지 찾는다.
+        keyIdx = 0
+        while keyIdx < len(findNode.keys):
+            if findNode.keys[keyIdx] == key:
+                # 트리 안에 키가 존재하는 경우 그 키에 대응하는 값을 리턴
+                print(findNode.values[keyIdx])
+                return findNode.values[keyIdx]
+        
+        # 트리 안에 키가 존재하지 않는 경우 None을 리턴
+        return None
+    
+    def range_search(self, lowerBound, upperBound):
+        # 키의 lower bound와 upper bound가 주어지면 그 범위 내에 해당하는 key와 value를 리턴한다.
+
+        findNode = self.root
+        if findNode is None:
+            return None
+        
+        # lowerbound를 기준으로 leaf까지 내려간다.
+        while findNode is not None and not findNode.isLeaf:
+            # 타고 내려갈 적절한 chlild node를 찾는다.
+            childIdx = 0
+            while childIdx < len(findNode.children) and lowerBound > findNode.keys[childIdx]:
+                childIdx += 1
+            
+            # rightmost child도 비교한다.
+            if childIdx == len(findNode.children) and findNode.r:
+                findNode = findNode.r
+
+            else:
+                findNode = findNode.chilren[childIdx]
+
+        # leaf node의 right sibling을 가리키는 포인터를 타고 범위 탐색을 한다.
+        while findNode.r is not None:
+            idx = 0
+            while idx < len(findNode.keys):
+                if lowerBound <= findNode.keys[idx] <= upperBound:
+                    print(f"{findNode.keys[idx]}, {findNode.values[idx]}")
+            findNode = findNode.r
+
+
     def print_tree(self, node, level):
         indent = "  " * level
         if node.isLeaf:
@@ -234,6 +297,10 @@ def main():
     parser.add_argument("-c", "--create", nargs=2, help="Create a new index file", metavar=("INDEX_FILE", "NODE_SIZE"))
     # 데이터 삽입 명령어
     parser.add_argument("-i", "--insert", nargs=2, help="Insert data into the index", metavar=("INDEX_FILE", "DATA_FILE"))
+    # search 명령어
+    parser.add_argument("-s", "--search", nargs=2, help="Search a value of a pointer to a record with the key", metavar=("INDEX_FILE", "KEY"))
+    # range search 명령어
+    parser.add_argument("-r", "--range_search", nargs=3, help="Searchhe values of pointers to records having the keys within the range provided", metavar=("INDEX_FILE", "START_KEY", "END_KEY"))
 
     args = parser.parse_args()
 
@@ -265,6 +332,25 @@ def main():
         print("Tree after insertion:")
         root = tree.root
         tree.print_tree(root, 0)
+
+    # search 명령
+    elif args.search:
+        index_file = args.insert[0]
+        key = args.insert[1]
+
+        # index file을 파싱해서 트리를 얻어냄
+
+        # 얻어낸 트리에 search
+
+    elif args.range_search:
+        index_file = args.insert[0]
+        start_key = args.insert[1]
+        end_key = args.insert[2]
+
+        # index fild을 파싱해서 트리를 얻어냄
+
+        # 얻어낸 트리에 range search
+
 
 if __name__ == "__main__":
     main()
