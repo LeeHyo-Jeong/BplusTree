@@ -1,13 +1,26 @@
 import argparse
 
 class Node:
+    # 클래스 내에서 전역적으로 사용되는 카운터
+    # 노드가 몇 개 생성되었는지를 나타낸다.
+    _id_counter = 0
+
     def __init__(self, b):
+        self.id = Node._get_next_id()
         self.m = 0           # key의 개수
         self.keys = []       # key들의 배열, 오름차순으로 정렬되어 있다. p를 keys와 (children 또는 values)로 나누어서 구현한다.
         self.isLeaf = False  # 이 노드가 leaf node인지를 판단하는 boolean
         self.b = b
         self.maxKeys = b - 1 # 노드가 가질 수 있는 최대 키의 개수 (b - 1과 동일)
         self.parent = None   # 부모 노드에 대한 포인터
+
+    @classmethod
+    def _get_next_id(cls):
+        # index file을 읽어서 트리를 만들 때 용이하게 하기 위해 노드마다 고유한 id 부여
+        next_id = cls._id_counter
+        cls._id_counter += 1
+        return next_id
+
 
 class InternalNode(Node):
     def __init__(self, b):
@@ -81,8 +94,6 @@ class InternalNode(Node):
             self.parent = newParentNode 
             newRightNode.parent = newParentNode 
 
-            print(f"***Internal Node split function return: {newParentNode.keys}***")
-            
             return newParentNode
 
 
@@ -95,13 +106,15 @@ class InternalNode(Node):
     
             newRightNode.parent = self.parent # 분할된 오른쪽 노드의 부모 노드 지정
             self.parent.keys.insert(idx, midKey) # 가운데 키 부모 노드에 삽입
-            self.parent.children.insert(idx + 1, newRightNode) # 오른쪽 분할 노드를 부모 노드의 새로운 자식으로 설정
             self.parent.m = len(self.parent.keys) # 부모 노드의 키 개수 업데이트
 
             if idx == len(self.parent.keys): # 부모 노드의 가장 마지막에 승천된 키가 삽입된다면 newRightNode는 부모 노드의 rightmost child가 된다.
                 self.parent.r = newRightNode
+            else:
+                self.parent.children.insert(idx + 1, newRightNode) # 오른쪽 분할 노드를 부모 노드의 새로운 자식으로 설정
 
-            if len(self.parent.keys) == self.parent.maxKeys + 1:
+
+            if len(self.parent.keys) > self.parent.maxKeys:
                 return self.parent.split()
         
         return None
@@ -140,7 +153,7 @@ class LeafNode(Node):
         newRightNode.values = self.values[midIdx + 1 :]
         newRightNode.r = self.r
         newRightNode.m = len(newRightNode.keys)
-        newRightNode.parent = self.parent # 여기 안되는듯. parent가 None으로 설정되어 있음. 애초부터 처음에 생성된 root의 parent가 설정 안 되어있음!! 그거 고치면 여기도 자동으로 될듯
+        newRightNode.parent = self.parent 
 
         # 기존 노드에는 가운데 키와 값을 포함한 왼쪽 키와 값들만 남겨둔다.
         self.keys = self.keys[: midIdx + 1]
@@ -151,7 +164,7 @@ class LeafNode(Node):
         if self.parent is None:
             newParentNode = InternalNode(self.b) # 부모 노드는 leaf가 아닌 internal node
             newParentNode.keys = [midKey]
-            newParentNode.children = [self, newRightNode]
+            newParentNode.children = [self]
             newParentNode.r = newRightNode
             newParentNode.m = 1
             self.parent = newParentNode
@@ -166,13 +179,15 @@ class LeafNode(Node):
                 idx += 1
             
             self.parent.keys.insert(idx, midKey)
-            self.parent.children.insert(idx + 1, newRightNode)
+            #self.parent.children.insert(idx + 1, newRightNode)
             self.parent.m = len(self.parent.keys)
 
             newRightNode.parent = self.parent
 
             if idx == len(self.parent.keys): # 부모 노드의 가장 마지막에 승천된 키가 삽입된다면 newRightNode는 부모 노드의 rightmost child가 된다.
                 self.parent.r = newRightNode
+            else:
+                self.parent.children.insert(idx + 1, newRightNode)
 
             if len(self.parent.keys) > self.parent.maxKeys:
                 return self.parent.split()
@@ -274,21 +289,19 @@ class BPlusTree:
 
     def save_to_file(self, file_name):
         with open(file_name, 'w') as f:
-            self._save_tree_recursive(self.root, f)
+            self._save_tree_recursive(self.root, f, 0)
 
-    def _save_tree_recursive(self, node, file):
+    def _save_tree_recursive(self, node, file, node_id):
         if node.isLeaf:
-            file.write(f"LeafNode(keys={node.keys}, values={node.values})\n")
-            if node.r:
-                file.write(f"  -> Right sibling: LeafNode(keys={node.r.keys})\n")
+            right_sibling_id = 'None' if node.r is None else node.r.id
+            file.write(f"LeafNode {node.keys};{right_sibling_id}\n")
         else:
-            file.write(f"InternalNode(keys={node.keys})\n")
+            children_ids = [child.id for child in node.children]
+            file.write(f"InternalNode {node.keys};{children_ids}\n")
             for i, child in enumerate(node.children):
-                file.write(f"  Child {i}:\n")
-                self._save_tree_recursive(child, file)
+                self._save_tree_recursive(child, file, i)
             if node.r:
-                file.write(f"  Rightmost Child:\n")
-                self._save_tree_recursive(node.r, file)
+                self._save_tree_recursive(node.r, file, node.r.id)
 
 def main():
     parser = argparse.ArgumentParser(description="B+ Tree Command Line Interface")
