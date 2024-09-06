@@ -1,3 +1,5 @@
+import argparse
+
 class Node:
     def __init__(self, b):
         self.m = 0           # key의 개수
@@ -33,7 +35,12 @@ class InternalNode(Node):
                 self.r.insert(key, value)
 
         if len(self.keys) > self.maxKeys:
-            self.split()
+            return self.split()
+        
+        # 현재 노드가 루트라면 루트 반환.
+        # 루트가 분할되지 않아도 새롭게 루트를 갱신하기 위한 로직.
+        if self.parent is None:
+            return self
 
 
     def split(self):
@@ -96,8 +103,8 @@ class InternalNode(Node):
 
             if len(self.parent.keys) == self.parent.maxKeys + 1:
                 return self.parent.split()
-            
-            return None
+        
+        return None
             
 class LeafNode(Node):
     def __init__(self, b):
@@ -171,61 +178,54 @@ class LeafNode(Node):
             
         return None
 
-
-import argparse
-
-def print_tree(node, level=0):
-    indent = "    " * level  # 들여쓰기 생성
+class BPlusTree:
+    def __init__(self, b):
+        self.root = LeafNode(b)
+        self.b = b
     
-    if node.isLeaf:
-        print(f"{indent}LeafNode(keys={node.keys}, values={node.values})")
-        if node.r:
-            print(f"{indent}  -> Right sibling: LeafNode(keys={node.r.keys})")
-    else:
-        print(f"{indent}InternalNode(keys={node.keys})")
-        for i, child in enumerate(node.children):
-            print(f"{indent}  Child {i}:")
-            print_tree(child, level + 1)  # 자식 노드를 재귀적으로 출력
-        
-        # Rightmost child 출력
-        if node.r:
-            print(f"{indent}  Rightmost Child:")
-            print_tree(node.r, level + 1)
+    def insert(self, key, value):
+        new_root = self.root.insert(key, value)
+        if new_root != None:
+            self.root = new_root
+        else:
+            # 새로운 루트가 반환되지 않더라도 부모가 없으면 루트를 갱신
+            while self.root.parent is not None:
+                self.root = self.root.parent
 
+    def print_tree(self, node, level):
+        indent = "  " * level
+        if node.isLeaf:
+            print(f"{indent}LeafNode(keys={node.keys}, values={node.values})")
+            if node.r:
+                print(f"{indent} -> Right sibling: LeafNode(keys={node.r.keys})")
+        else:
+            print(f"{indent}InternalNode(keys={node.keys})")
+            for i, child in enumerate(node.children):
+                print(f"{indent}  Child {i}:")
+                self.print_tree(child, level + 1)  # 자식 노드를 재귀적으로 출력
 
+            # Rightmost child 출력
+            if node.r:
+                print(f"{indent}  Rightmost Child:")
+                self.print_tree(node.r, level + 1)
 
-# 인덱스 파일을 생성하는 함수
-def create_index_file(index_file, node_size):
-    b = node_size  # b 값을 설정
-    print(f"Index file {index_file} created with node size {b}")
-    
-    # 루트 노드를 LeafNode로 생성
-    root = LeafNode(b)  # 처음에는 루트 노드를 LeafNode로 생성
-    return root
+    def save_to_file(self, file_name):
+        with open(file_name, 'w') as f:
+            self._save_tree_recursive(self.root, f)
 
-# 데이터를 삽입하는 함수
-def insert_into_tree(root, data_file):
-    # CSV 파일에서 key-value를 읽어서 삽입
-    with open(data_file, 'r') as f:
-        for line in f:
-            key, value = line.strip().split(',')
-            key = int(key)
-
-            # root 노드에 삽입 시도
-            new_root = root.insert(key, value)  # 삽입 과정에서 분할 발생 시 새로운 루트 반환
-            
-            # 만약 새로운 루트가 반환되면, 트리의 루트를 갱신
-            if new_root is not None:
-                root = new_root  # 새로운 루트가 생긴 경우 갱신
-                print(f"New root set: {root.keys}")
-
-
-    while root.parent != None:
-        root = root.parent
-    print("Tree after insertion:")
-    print_tree(root)
-
-
+    def _save_tree_recursive(self, node, file):
+        if node.isLeaf:
+            file.write(f"LeafNode(keys={node.keys}, values={node.values})\n")
+            if node.r:
+                file.write(f"  -> Right sibling: LeafNode(keys={node.r.keys})\n")
+        else:
+            file.write(f"InternalNode(keys={node.keys})\n")
+            for i, child in enumerate(node.children):
+                file.write(f"  Child {i}:\n")
+                self._save_tree_recursive(child, file)
+            if node.r:
+                file.write(f"  Rightmost Child:\n")
+                self._save_tree_recursive(node.r, file)
 
 def main():
     parser = argparse.ArgumentParser(description="B+ Tree Command Line Interface")
@@ -241,16 +241,30 @@ def main():
     if args.create:
         index_file = args.create[0]  # 인덱스 파일 이름
         node_size = int(args.create[1])  # 노드 크기 b
-        root = create_index_file(index_file, node_size)  # 트리 생성
+        tree = BPlusTree(node_size)  # 트리 생성
         print(f"Created a new B+ tree with node size: {node_size}")
+        tree.save_to_file(index_file)  # 최초 트리 구조를 파일에 저장
+        print(f"Index file {index_file} saved with initial tree structure.")
 
     # 데이터 삽입 명령
     elif args.insert:
         index_file = args.insert[0]
         data_file = args.insert[1]
-        root = create_index_file(index_file, 4)  # 임시로 node size 4 설정
-        root = insert_into_tree(root, data_file)  # 최종 루트로 갱신
 
+        tree = BPlusTree(4)  # 임시로 node size 4 설정 (기존 파일로부터 불러오는 부분 필요)
+        # tree.load_from_file(index_file)  # 기존의 index.dat 파일을 읽어와서 트리 복원
+        
+        # 데이터 삽입 후 트리 및 파일 갱신
+        with open(data_file, 'r') as f:
+            for line in f:
+                key, value = line.strip().split(',')
+                tree.insert(int(key), value)
+
+        tree.save_to_file(index_file)
+
+        print("Tree after insertion:")
+        root = tree.root
+        tree.print_tree(root, 0)
 
 if __name__ == "__main__":
     main()
