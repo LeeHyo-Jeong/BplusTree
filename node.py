@@ -35,17 +35,18 @@ class InternalNode(Node):
         idx = 0
         while idx < len(self.keys) and key > self.keys[idx]:
             idx += 1
-        
+
         # leaf node에 도달하면 삽입
         if idx < len(self.children) and self.children[idx].isLeaf:
             self.children[idx].insert(key, value)
-        elif idx == len(self.keys) and self.r is not None and self.r.isLeaf:
+        elif idx == len(self.keys) and self.r is not None:
             self.r.insert(key, value)
         else:
             if idx < len(self.children):
                 self.children[idx].insert(key, value)
             elif idx == len(self.keys) and self.r is not None:
                 self.r.insert(key, value)
+                
 
         if len(self.keys) > self.maxKeys:
             return self.split()
@@ -72,7 +73,8 @@ class InternalNode(Node):
         self.keys = self.keys[: midIdx] # 기존 노드에 왼쪽 절반 키만 남겨둠
         self.children = self.children[: midIdx + 1] # 기존 노드의 왼쪽 절반 키의 자식 노드만 남겨둠
         self.m = len(self.keys) # 키의 개수 설정
-        self.r = None # 기존의 r은 제거
+        self.r.parent = newRightNode
+        self.r = self.children.pop() # 왼쪽 노드의 rightmost children 설정
 
         # self.r은 어떻게 바꿔야 할지 고민좀....
 
@@ -100,19 +102,24 @@ class InternalNode(Node):
         # 부모 노드가 존재한다면 부모 노드에 가운데 키 승천
         else:
             # 가운데 키가 부모 노드에서 들어갈 적절한 위치를 찾음
+            duplicatedFlag = False
             idx = 0
-            while idx < len(self.parent.keys) and midKey > self.parent.keys[idx]:
+            while idx < len(self.parent.keys) and midKey >= self.parent.keys[idx]:
+                if midKey == self.parent.keys[idx]:
+                    duplicatedFlag = True
+                    break
                 idx += 1
     
             newRightNode.parent = self.parent # 분할된 오른쪽 노드의 부모 노드 지정
-            self.parent.keys.insert(idx, midKey) # 가운데 키 부모 노드에 삽입
-            self.parent.m = len(self.parent.keys) # 부모 노드의 키 개수 업데이트
+            if not duplicatedFlag:
+                self.parent.keys.insert(idx, midKey) # 가운데 키 부모 노드에 삽입
+                self.parent.m = len(self.parent.keys) # 부모 노드의 키 개수 업데이트
 
-            if idx == len(self.parent.keys): # 부모 노드의 가장 마지막에 승천된 키가 삽입된다면 newRightNode는 부모 노드의 rightmost child가 된다.
+            if idx == len(self.parent.keys) - 1: # 부모 노드의 가장 마지막에 승천된 키가 삽입된다면 newRightNode는 부모 노드의 rightmost child가 된다.
+                self.parent.children.insert(idx, self)
                 self.parent.r = newRightNode
             else:
                 self.parent.children.insert(idx + 1, newRightNode) # 오른쪽 분할 노드를 부모 노드의 새로운 자식으로 설정
-
 
             if len(self.parent.keys) > self.parent.maxKeys:
                 return self.parent.split()
@@ -151,7 +158,8 @@ class LeafNode(Node):
         newRightNode = LeafNode(self.b)
         newRightNode.keys = self.keys[midIdx + 1 :]
         newRightNode.values = self.values[midIdx + 1 :]
-        newRightNode.r = self.r
+        if self.r is not None: 
+            newRightNode.r = self.r
         newRightNode.m = len(newRightNode.keys)
         newRightNode.parent = self.parent 
 
@@ -173,19 +181,24 @@ class LeafNode(Node):
             return newParentNode
 
         else:
+            duplicatedFlag = False
             # 부모 노드에 키를 삽입할 적절한 위치를 찾는다.
             idx = 0
-            while idx < len(self.parent.keys) and midKey > self.parent.keys[idx]:
-                idx += 1
+            while idx < len(self.parent.keys) and midKey >= self.parent.keys[idx]:
+                if self.parent.keys[idx] == midKey:  # 중복 키 발견 시 삽입하지 않고 리턴
+                    duplicatedFlag = True
+                    break
+                idx += 1      
             
-            self.parent.keys.insert(idx, midKey)
-            #self.parent.children.insert(idx + 1, newRightNode)
-            self.parent.m = len(self.parent.keys)
+            if not duplicatedFlag:
+                self.parent.keys.insert(idx, midKey)
+                self.parent.m = len(self.parent.keys)
 
             newRightNode.parent = self.parent
 
-            if idx == len(self.parent.keys): # 부모 노드의 가장 마지막에 승천된 키가 삽입된다면 newRightNode는 부모 노드의 rightmost child가 된다.
-                self.parent.r = newRightNode
+            if idx == len(self.parent.keys) - 1: # 부모 노드의 가장 마지막에 승천된 키가 삽입된다면 newRightNode는 부모 노드의 rightmost child가 된다.
+                self.parent.children.insert(idx, self) # 기존의 rightmost child는 부모 노드의 children으로
+                self.parent.r = newRightNode # 새로운 rightmost child 지정
             else:
                 self.parent.children.insert(idx + 1, newRightNode)
 
@@ -212,19 +225,18 @@ class BPlusTree:
         findNode = self.root
         if findNode is None:
             return None
-
-        path = [] # 어떤 노드를 타고 내려갔는지 키를 저장하기 위한 배열이다.
+        
         # leaf까지 내려간다.
         while findNode is not None and not findNode.isLeaf:
-            print(findNode.keys)
+            print(str(findNode.keys).strip('[]'))
             # 타고 내려갈 적절한 child node를 찾는다.
             childIdx = 0
-            while childIdx < len(findNode.keys) and key > findNode.keys[childIdx]:
+            while childIdx < len(findNode.keys) and key >= findNode.keys[childIdx]:
                 childIdx += 1
 
             # rightmost child도 비교한다.
             # 모든 left children들의 키들보다 찾으려는 키가 큰 경우 rightmost child로 내려간다.
-            if childIdx == len(findNode.children) and findNode.r:
+            if childIdx == len(findNode.keys) and findNode.r:
                 findNode = findNode.r
             else:
                 findNode = findNode.children[childIdx]
@@ -234,8 +246,8 @@ class BPlusTree:
         while keyIdx < len(findNode.keys):
             if findNode.keys[keyIdx] == key:
                 # 트리 안에 키가 존재하는 경우 그 키에 대응하는 값을 리턴
-                print(findNode.values[keyIdx])
                 return findNode.values[keyIdx]
+            keyIdx += 1
         
         # 트리 안에 키가 존재하지 않는 경우 None을 리턴
         return None
@@ -259,16 +271,16 @@ class BPlusTree:
                 findNode = findNode.r
 
             else:
-                findNode = findNode.chilren[childIdx]
+                findNode = findNode.children[childIdx]
 
         # leaf node의 right sibling을 가리키는 포인터를 타고 범위 탐색을 한다.
-        while findNode.r is not None:
+        while findNode is not None:
             idx = 0
             while idx < len(findNode.keys):
                 if lowerBound <= findNode.keys[idx] <= upperBound:
                     print(f"{findNode.keys[idx]}, {findNode.values[idx]}")
+                idx += 1
             findNode = findNode.r
-
 
     def print_tree(self, node, level):
         indent = "  " * level
@@ -287,21 +299,85 @@ class BPlusTree:
                 print(f"{indent}  Rightmost Child:")
                 self.print_tree(node.r, level + 1)
 
-    def save_to_file(self, file_name):
-        with open(file_name, 'w') as f:
-            self._save_tree_recursive(self.root, f, 0)
+    def save_to_file(self, file_name, append = False):
+        mode = 'a' if append else 'w' # 처음에 트리 생성 시 쓰여진 노드 크기(b) 값을 유지하기 위해 해당 로직 추가
+        with open(file_name, mode) as f:
+            self._save_tree_recursive(self.root, f)
 
-    def _save_tree_recursive(self, node, file, node_id):
+    def _save_tree_recursive(self, node, file):
         if node.isLeaf:
+            # right sibling이 있을 경우 그 ID를 기록, 없으면 'None' 기록
             right_sibling_id = 'None' if node.r is None else node.r.id
             file.write(f"LeafNode {node.keys};{right_sibling_id}\n")
         else:
+            # internal node의 자식 ID를 기록
             children_ids = [child.id for child in node.children]
-            file.write(f"InternalNode {node.keys};{children_ids}\n")
-            for i, child in enumerate(node.children):
-                self._save_tree_recursive(child, file, i)
+            right_sibling_id = 'None' if node.r is None else node.r.id
+            file.write(f"InternalNode {node.keys};{children_ids};{right_sibling_id}\n")
+
+            # 자식 노드들에 대해 재귀 호출하여 기록
+            for child in node.children:
+                self._save_tree_recursive(child, file)
+
+            # 마지막 자식의 rightmost sibling도 기록
             if node.r:
-                self._save_tree_recursive(node.r, file, node.r.id)
+                self._save_tree_recursive(node.r, file)
+
+    def load_from_file(self, file_name):
+        pass
+    
+'''
+    def load_from_file(self, file_name):
+        node_map = {}
+        with open(file_name, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                parts = line.strip().split(';')
+                node_type, keys = parts[0].split(' ', 1)
+                keys = list(map(int, keys.strip('[]').split(','))) if keys.strip('[]') else []
+
+                # 오른쪽 형제 노드 ID 파싱
+                right_sibling_id = parts[1].strip() if parts[1] != 'None' else None
+
+                if node_type == "LeafNode":
+                    node = LeafNode(self.b)
+                    node.keys = keys
+                    node.values = ['placeholder'] * len(keys)  # 임시 값으로 설정
+                    node_map[node.id] = node  # 노드를 저장
+                else:
+                    node = InternalNode(self.b)
+                    node.keys = keys
+                    node_map[node.id] = node  # 노드를 저장
+
+                # 오른쪽 형제 노드 복원 처리
+                if right_sibling_id and right_sibling_id != 'None':
+                    try:
+                        node.r = node_map.get(int(right_sibling_id))  # 하나의 형제 노드만 처리
+                    except ValueError:
+                        print(f"잘못된 형제 노드 ID: {right_sibling_id}")
+                        node.r = None
+                else:
+                    node.r = None
+
+            # InternalNode의 자식 복원 처리
+            for line in lines:
+                parts = line.strip().split(';')
+                node_type, keys = parts[0].split(' ', 1)
+                keys = list(map(int, keys.strip('[]').split(','))) if keys.strip('[]') else []
+                if node_type == "InternalNode":
+                    children_ids = list(map(int, parts[2].strip('[]').split(','))) if len(parts) > 2 else []
+                    node = node_map[node.id]
+                    node.children = [node_map[child_id] for child_id in children_ids]
+
+        # 루트 설정: 부모가 없는 노드를 루트로 설정
+        for node_id in node_map:
+            node = node_map[node_id]
+            if node.parent is None:
+                self.root = node
+                break
+
+
+'''
 
 def main():
     parser = argparse.ArgumentParser(description="B+ Tree Command Line Interface")
@@ -313,9 +389,13 @@ def main():
     # search 명령어
     parser.add_argument("-s", "--search", nargs=2, help="Search a value of a pointer to a record with the key", metavar=("INDEX_FILE", "KEY"))
     # range search 명령어
-    parser.add_argument("-r", "--range_search", nargs=3, help="Searchhe values of pointers to records having the keys within the range provided", metavar=("INDEX_FILE", "START_KEY", "END_KEY"))
+    parser.add_argument("-r", "--range_search", nargs=3, help="Search the values of pointers to records having the keys within the range provided", metavar=("INDEX_FILE", "START_KEY", "END_KEY"))
 
     args = parser.parse_args()
+
+    # 전역 변수로 설정된 노드 크기 b
+    node_size = None
+    tree = None
 
     # 인덱스 파일 생성 명령
     if args.create:
@@ -323,46 +403,94 @@ def main():
         node_size = int(args.create[1])  # 노드 크기 b
         tree = BPlusTree(node_size)  # 트리 생성
         print(f"Created a new B+ tree with node size: {node_size}")
-        tree.save_to_file(index_file)  # 최초 트리 구조를 파일에 저장
+
+        with open(index_file, 'w') as f:
+            f.write(f"{node_size}\n")  # 인덱스 파일의 첫 번째 줄에 b 값 기록
+        tree.save_to_file(index_file, append = True)  # 최초 트리 구조를 파일에 저장
+
         print(f"Index file {index_file} saved with initial tree structure.")
 
     # 데이터 삽입 명령
     elif args.insert:
         index_file = args.insert[0]
         data_file = args.insert[1]
+        node_size = 0
 
-        tree = BPlusTree(4)  # 임시로 node size 4 설정 (기존 파일로부터 불러오는 부분 필요)
-        # tree.load_from_file(index_file)  # 기존의 index.dat 파일을 읽어와서 트리 복원
+        with open(index_file, 'r') as f:
+            node_size = int(f.readline().strip())
+
+        # 이거 고치기. 입력한 크기로 돼야 하는데 무조건 4로 됨.
+        tree = BPlusTree(node_size)
+
+        if tree is None:
+            print("Empty Tree")
+            return
         
-        # 데이터 삽입 후 트리 및 파일 갱신
+        with open(data_file, 'r') as f:
+            for line in f:
+                key, value = line.strip().split(',')
+                if int(key) == 70:
+                    print("here")
+                tree.insert(int(key), value)
+
+        tree.print_tree(tree.root, 0)
+        tree.save_to_file(index_file, append = True)
+
+    # search 명령
+    elif args.search:
+        index_file = args.search[0]
+        search_key = int(args.search[1])
+        node_size = 0
+
+        with open(index_file, 'r') as f:
+            node_size = int(f.readline().strip())
+
+        tree = BPlusTree(node_size)  # 기본적으로 node size는 4로 설정, 인덱스 파일을 통해 복원 가능
+        print("***")
+        print(tree.b)
+
+        # load_from_file 고치고 이 부분 load_from_file로 얻어온 트리에서 서치하는거로 바꿔야함.
+        data_file="testInput.csv"
         with open(data_file, 'r') as f:
             for line in f:
                 key, value = line.strip().split(',')
                 tree.insert(int(key), value)
 
-        tree.save_to_file(index_file)
+        # tree.print_tree(tree.root, 0)
 
-        print("Tree after insertion:")
-        root = tree.root
-        tree.print_tree(root, 0)
+        if tree is None:
+            print("Empty Tree")
+            return
 
-    # search 명령
-    elif args.search:
-        index_file = args.insert[0]
-        key = args.insert[1]
+        result = tree.search(search_key)
+        if result is not None:
+            print(result)
+        else:
+            print("NOT FOUND")
 
-        # index file을 파싱해서 트리를 얻어냄
-
-        # 얻어낸 트리에 search
-
+    # range search 명령
     elif args.range_search:
-        index_file = args.insert[0]
-        start_key = args.insert[1]
-        end_key = args.insert[2]
+        index_file = args.range_search[0]
+        start_key = int(args.range_search[1])
+        end_key = int(args.range_search[2])
 
-        # index fild을 파싱해서 트리를 얻어냄
+        tree = BPlusTree(4)  # 기본 크기 4로 설정
+        tree.load_from_file(index_file)  # index.dat 파일에서 트리를 복원
 
-        # 얻어낸 트리에 range search
+        # load_from_file 고치고 이 부분 load_from_file로 얻어온 트리에서 서치하는거로 바꿔야함.
+        data_file="testInput.csv"
+        with open(data_file, 'r') as f:
+            for line in f:
+                key, value = line.strip().split(',')
+                tree.insert(int(key), value)
+
+        if tree is None:
+            print("Empty Tree")
+            return
+            
+
+        tree.range_search(start_key, end_key)
+
 
 
 if __name__ == "__main__":
