@@ -3,16 +3,18 @@ import argparse
 class Node:
     # 클래스 내에서 전역적으로 사용되는 카운터
     # 노드가 몇 개 생성되었는지를 나타낸다.
+    # 각 노드에 번호를 매기기 위해 사용된다.
     _id_counter = 0
 
     def __init__(self, b):
         self.id = Node._get_next_id()
-        self.m = 0           # key의 개수
-        self.keys = []       # key들의 배열, 오름차순으로 정렬되어 있다. p를 keys와 (children 또는 values)로 나누어서 구현한다.
-        self.isLeaf = False  # 이 노드가 leaf node인지를 판단하는 boolean
-        self.b = b
-        self.maxKeys = b - 1 # 노드가 가질 수 있는 최대 키의 개수 (b - 1과 동일)
-        self.parent = None   # 부모 노드에 대한 포인터
+        self.m = 0                  # key의 개수
+        self.keys = []              # key들의 배열, 오름차순으로 정렬되어 있다. p를 keys와 (children 또는 values)로 나누어서 구현한다.
+        self.isLeaf = False         # 이 노드가 leaf node인지를 판단하는 boolean
+        self.b = b                  # create 명령어로 입력 받은 최대 자식 노드의 개수
+        self.maxKeys = b - 1        # 노드가 가질 수 있는 최대 키의 개수 (b - 1과 동일)
+        self.minKeys = (b // 2) - 1 # 노드가 가져야 하는 최소 키의 개수
+        self.parent = None          # 부모 노드에 대한 포인터
 
     @classmethod
     def _get_next_id(cls):
@@ -126,6 +128,29 @@ class InternalNode(Node):
         
         return None
     
+    def delete(self, key):
+        # internal node에 트리에서 지우고자 하고 있는 키가 있다면 left subtree의 최대 키 값으로 교체
+        idx = 0
+        while self.keys[idx] != key:
+            idx += 1
+            
+        # left child가 존재하는 경우 left subtree의 최댓값을 구한다.
+        leftMax = 0
+        if self.children[idx]:
+            # left child의 rightmost child로만 이동한다.
+            # leaf에 도달하면 그 node의 마지막 key 값을 리턴한다.
+            findNode = self.children[idx]
+            while not findNode.isLeaf:
+                findNode = findNode.r
+
+            leftMax = findNode.keys[-1]
+            self.keys[idx] = leftMax
+            
+    '''
+    def merge(self):
+        # internal node의 merge 과정
+    
+    '''
             
 class LeafNode(Node):
     def __init__(self, b):
@@ -206,6 +231,105 @@ class LeafNode(Node):
                 return self.parent.split()
             
         return None
+    
+    def delete(self, key, internalFlag): # 삭제할 키, 삭제할 키가 internal node에도 존재하는지 여부를 나타내는 flag
+        # internal node에도 해당 키가 존재하는 경우 internal node에서 먼저 지운다.
+        if internalFlag:
+            findNode = self.parent
+            while findNode is not None:
+                if findNode.keys.__contains__(key):
+                    findNode.delete(key)
+                findNode = findNode.parent
+
+        # 노드 내에서 삭제할 키가 몇 번째 인덱스에 존재하는지 찾고 지운다.
+        idx = 0
+        while idx < len(self.keys):
+            if self.keys[idx] == key:
+                del self.keys[idx]
+                del self.values[idx]
+                break
+            idx += 1
+
+        # 루트 노드인 경우 삭제 후 종료한다.
+        if self.parent is None:
+            return
+        
+        # 삭제 후 키가 최소 키 개수보다 많다면 종료한다.
+        if len(self.keys) >= self.minKeys:
+            return
+        
+        '''삭제 후 키가 최소 키 개수보다 적은 경우'''
+        # left sibling에서 키를 분배받을 수 있는지 확인하기 위해 left sibling을 찾는다.
+        parentNode = self.parent
+        # 삭제할 키가 존재하는 노드가 parent의 몇 번째 자식인지 찾는다.
+        deleteNodeIdx = 0
+        while deleteNodeIdx < len(parentNode.keys):
+            for child in parentNode.children:
+                if child == self:
+                    break
+            deleteNodeIdx += 1
+        
+        # 삭제할 키가 존재하는 노드가 leftmost child가 아닌 경우
+        if deleteNodeIdx > 0:
+            # left sibling의 키 개수를 비교한다.
+            leftSiblingNode = parentNode.children[deleteNodeIdx - 1]
+            # left sibling으로부터 키를 분배받을 수 있는 경우 분배 받는다.
+            if len(leftSiblingNode.keys) > leftSiblingNode.minKeys:
+                self.keys.insert(0, leftSiblingNode.keys.pop()) # left sibling의 max key를 지원받는다.
+                self.values.insert(0, leftSiblingNode.values.pop()) # value도 업데이트 한다.
+                parentNode.keys[deleteNodeIdx - 1] = leftSiblingNode.keys[-1] # 삭제 할 키가 존재하는 노드와 left sibling 사이 부모의 key를 left sibling의 key의 최댓값으로 업데이트 한다.
+
+                return
+            
+        # left sibling으로부터 키를 분배받을 수 없는 경우 right sibling으로부터 분배받을 수 있는지 확인한다.
+        # 삭제할 키가 존재하는 노드가 rightmost child가 아닌 경우
+        elif deleteNodeIdx < len(parentNode.children):
+            # right sibling의 키 개수를 비교한다.
+            rightSiblingNode = self.r
+            if len(rightSiblingNode.key) > rightSiblingNode.minKeys:
+                self.keys.append(rightSiblingNode.keys[0]) # right sibling의 min key를 지원받는다.
+                self.values.append(rightSiblingNode.values[0]) # value도 업데이트 한다.
+
+                parentNode.keys[deleteNodeIdx] = rightSiblingNode.keys[0] # 삭제 할 키가 존재하는 노드와 right sibling 사이 부모의 key를 right sibling의 최솟값으로 업데이트 한다.
+
+                del rightSiblingNode.keys[0] # 지원받은 후 right sibling에서 지원해준 key 삭제
+                del rightSiblingNode.values[0] # 지원받은 후 right sibling에서 지원해준 value 삭제
+                
+                return
+
+        # 양 옆 sibling들로부터 키를 분배받을 수 없는 경우 부모 노드로부터 키를 지원받고 형제와 병합한다.
+        self.merge(deleteNodeIdx)
+
+    def merge(self, deleteNodeIdx):
+        parentNode = self.parent
+        # left sibling과 병합
+        if deleteNodeIdx > 0:
+            # left sibling과 병합하는 경우 왼쪽 노드의 부모 key를 삭제한다.
+            leftSiblingNode = parentNode.children[deleteNodeIdx - 1]
+            leftSiblingNode.keys = leftSiblingNode.keys + self.keys
+            leftSiblingNode.values = leftSiblingNode.values + self.values
+
+            # 현재 노드의 부모 key를 삭제한다.
+            del self.parent.keys[deleteNodeIdx - 1]
+            del self.parent.children[deleteNodeIdx - 1]
+
+            # left sibling의 정보를 업데이트 한다.
+            leftSiblingNode.m = len(leftSiblingNode.keys)
+            
+        # leftmost node인 경우 right sibling과 병합
+        else: 
+            # right sibling과 병합하는 경우 지우려는 키가 있는 노드의 부모 key를 삭제한다.
+            rightSiblingNode = self.r
+            rightSiblingNode.keys = self.keys + rightSiblingNode.keys
+            rightSiblingNode.values = self.values + rightSiblingNode.values
+
+            del self.parent.keys[deleteNodeIdx]
+            del self.parent.children[deleteNodeIdx]
+
+        # 병합 후 부모 노드의 키가 부족하다면 재귀적으로 부모 노드에서도 병합이 필요하다.
+        if len(parentNode.keys) < parentNode.minKeys:
+            #parentNode.merge()        
+
 
 class BPlusTree:
     def __init__(self, b):
@@ -226,6 +350,8 @@ class BPlusTree:
         if findNode is None:
             return None
         
+        internalFlag = False # 해당 키가 internal node에도 존재하는지 여부를 나타내는 flag이다.
+
         # leaf까지 내려간다.
         while findNode is not None and not findNode.isLeaf:
             print(str(findNode.keys).strip('[]'))
@@ -233,6 +359,7 @@ class BPlusTree:
             childIdx = 0
             while childIdx < len(findNode.keys) and key >= findNode.keys[childIdx]:
                 if findNode.keys[childIdx] == key: # internal node에 해당 키가 존재하면 그 키가 있는 위치의 child node에 찾고자 하는 키가 존재한다.
+                    internalFlag = True
                     break
                 childIdx += 1
 
@@ -249,7 +376,9 @@ class BPlusTree:
         while keyIdx < len(findNode.keys):
             if findNode.keys[keyIdx] == key:
                 # 트리 안에 키가 존재하는 경우 그 키에 대응하는 값을 리턴
-                return findNode.values[keyIdx]
+                # return findNode.values[keyIdx]
+                # 트리 안에 키가 존재하는 경우 그 키가 존재하는 노드를 리턴
+                return findNode, internalFlag
             keyIdx += 1
         
         # 트리 안에 키가 존재하지 않는 경우 None을 리턴
@@ -284,6 +413,15 @@ class BPlusTree:
                     print(f"{findNode.keys[idx]}, {findNode.values[idx]}")
                 idx += 1
             findNode = findNode.r
+
+    def delete(self, key):
+        deleteNode, internalFlag = self.search(key) # 삭제 할 키가 존재하는 노드와 그 키가 internal node에도 존재하는지 여부
+        
+        if deleteNode is None:
+            print("Given key does not exist in the tree")
+            return
+        
+        deleteNode.delete(key, internalFlag)
 
     def print_tree(self, node, level):
         indent = "  " * level
@@ -410,14 +548,16 @@ class BPlusTree:
 def main():
     parser = argparse.ArgumentParser(description="B+ Tree Command Line Interface")
 
-    # 인덱스 파일 생성 명령어
+    # index file creation 명령어
     parser.add_argument("-c", "--create", nargs=2, help="Create a new index file", metavar=("INDEX_FILE", "NODE_SIZE"))
-    # 데이터 삽입 명령어
+    # insertion 명령어
     parser.add_argument("-i", "--insert", nargs=2, help="Insert data into the index", metavar=("INDEX_FILE", "DATA_FILE"))
     # search 명령어
     parser.add_argument("-s", "--search", nargs=2, help="Search a value of a pointer to a record with the key", metavar=("INDEX_FILE", "KEY"))
     # range search 명령어
     parser.add_argument("-r", "--range_search", nargs=3, help="Search the values of pointers to records having the keys within the range provided", metavar=("INDEX_FILE", "START_KEY", "END_KEY"))
+    # deletion 명령어
+    parser.add_argument("-d", "--delete", nargs=2, help="Delete all the key-value pairs inside the input data file from the idnex file", metavar=("INDEX_FILE", "DATA_FILE"))
 
     args = parser.parse_args()
 
@@ -494,6 +634,28 @@ def main():
         
         tree.range_search(start_key, end_key)
 
+    # deletion 명령
+    elif args.delete:
+        index_file = args.delete[0]
+        data_file = args.delete[1]
+
+        keys = [] # 지워야 할 노드들의 키를 담는 배열
+        with open(data_file, 'r') as f:
+            for line in f:
+                keys.append(int(line))
+
+        tree = BPlusTree(0) # 우선 최대 노드 개수를 0으로 설정
+        tree = tree.load_from_file(index_file) # 인덱스 파일에 저장된 정보를 불러와 트리를 구성. 트리의 최대 노드 개수도 재설정 됨
+
+        if tree is None:
+            print("Empty Tree")
+            return
+        
+        for key in keys:
+            tree.delete(key)
+            print(f"Deleted key: {key}")
+
+        # 인덱스 파일도 수정
 
 
 if __name__ == "__main__":
