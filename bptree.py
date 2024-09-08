@@ -238,6 +238,9 @@ class LeafNode(Node):
         return None
     
     def delete(self, key, internalFlag): # 삭제할 키, 삭제할 키가 internal node에도 존재하는지 여부를 나타내는 flag
+        # delete 9
+        if key == 5:
+            print("FFFF")
         # 노드 내에서 삭제할 키가 몇 번째 인덱스에 존재하는지 찾고 지운다.
         idx = 0
         while idx < len(self.keys):
@@ -253,6 +256,7 @@ class LeafNode(Node):
         
         # 삭제 후 키가 최소 키 개수보다 많다면 종료한다.
         if len(self.keys) >= self.minKeys:
+            # 삭제 후 키가 최소 키 개수보다 많아도 internal node에 그 키가 존재하면 internal node에서도 삭제 해야한다.
             if not internalFlag:
                 return
         
@@ -313,10 +317,15 @@ class LeafNode(Node):
         if deleteNodeIdx > 0:
             # left sibling과 병합하는 경우 왼쪽 노드의 부모 key를 삭제한다.
             leftSiblingNode = parentNode.children[deleteNodeIdx - 1]
-            #leftSiblingNode.keys = leftSiblingNode.keys + self.keys
-            #leftSiblingNode.values = leftSiblingNode.values + self.values
+
+            # left sibling이 leftmost children이 아닌 경우 left sibling의 left sibling의 r 포인터를 다시 설정한다.
+            if deleteNodeIdx - 2 > 0:
+                parentNode.children[deleteNodeIdx - 2].r = self
             self.keys = leftSiblingNode.keys + self.keys
             self.values = leftSiblingNode.values + self.values
+
+            print('-------')
+            print(self.values)
 
             # 왼쪽 노드의 부모 key를 삭제했을 때 부모 노드의 key 개수가 부족해진다면 merge를 통해 삭제하려는 부모 key를
             # left subtree의 최댓값으로 대체한다.
@@ -336,18 +345,18 @@ class LeafNode(Node):
         else: 
             # right sibling과 병합하는 경우 지우려는 키가 있는 노드의 부모 key를 삭제한다.
             rightSiblingNode = self.r
-            #rightSiblingNode.keys = self.keys + rightSiblingNode.keys
-            #rightSiblingNode.values = self.values + rightSiblingNode.values
             self.keys = self.keys + rightSiblingNode.keys
             self.values = self.values + rightSiblingNode.values
             self.parent = rightSiblingNode.parent
+            self.r = rightSiblingNode.r
 
             del self.parent.keys[deleteNodeIdx]
-            del self.parent.children[deleteNodeIdx]
+            del self.parent.children[deleteNodeIdx + 1]
 
         # 병합 후 부모 노드의 키가 부족하다면 재귀적으로 부모 노드에서도 병합이 필요하다.
         # 루트 노드인 경우는 제외한다.
-        if len(parentNode.keys) < parentNode.minKeys and parentNode.root:
+        if len(parentNode.keys) < parentNode.minKeys and parentNode.parent is not None:
+            # 여기 merge의 parameter로 무슨 인덱스가 들어가야 할지 고민하기!!!!
             parentNode.merge()        
 
 
@@ -445,7 +454,6 @@ class BPlusTree:
 
     def print_tree(self, node, level):
         indent = "  " * level
-        print(f"node id: {node.id}")
         if node.isLeaf:
             print(f"{indent}LeafNode(keys={node.keys}, values={node.values})")
             if node.r:
@@ -636,8 +644,6 @@ def main():
         if result is None:
             print("NOT FOUND")
             return
-        
-        print(result)
 
     # range search 명령
     elif args.range_search:
