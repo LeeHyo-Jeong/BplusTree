@@ -221,9 +221,10 @@ class InternalNode(Node):
                 self.parent.r = self
                 self.parent.children.pop()
 
-            # 이거 추가함
             if len(self.parent.children) == 0:
                 self.parent = None
+                # 새로운 루트인 self를 리턴
+                return self
 
         # 부모 노드가 루트 노드가 아닌 경우 부모 노드에 키가 부족해진다면 재귀적으로 병합 진행
         if len(parentNode.keys) < parentNode.minKeys and parentNode.parent is not None:
@@ -317,6 +318,7 @@ class LeafNode(Node):
     def delete(self, key, internalFlag): # 삭제할 키, 삭제할 키가 internal node에도 존재하는지 여부를 나타내는 flag
         # 노드 내에서 삭제할 키가 몇 번째 인덱스에 존재하는지 찾고 지운다.
         idx = 0
+        newRoot = None
         while idx < len(self.keys):
             if self.keys[idx] == key:
                 del self.keys[idx]
@@ -328,6 +330,8 @@ class LeafNode(Node):
         if self.parent is None:
             return
         
+        if key == 742:
+            print("HERE")
         # 삭제 후 키가 최소 키 개수보다 많다면 종료한다.
         if len(self.keys) >= self.minKeys:
             # 삭제 후 키가 최소 키 개수보다 많아도 internal node에 그 키가 존재하면 internal node에서도 삭제 해야한다.
@@ -433,7 +437,7 @@ class LeafNode(Node):
                 parentNode.children[deleteNodeIdx + 1] = self
             else:
                 self.parent.r = self
-            self.r = rightSiblingNode.r
+            self.r = rightSiblingNode.r # 얘 필요없는듯
 
             del parentNode.keys[deleteNodeIdx]
             del parentNode.children[deleteNodeIdx]
@@ -503,6 +507,8 @@ class BPlusTree:
                 # 트리 안에 키가 존재하는 경우 그 키에 대응하는 값을 리턴
                 # return findNode.values[keyIdx]
                 # 트리 안에 키가 존재하는 경우 그 키가 존재하는 노드를 리턴
+                result = int(findNode.values[keyIdx].strip('\'\''))
+                print(result)
                 return findNode, internalFlag
             keyIdx += 1
         
@@ -535,7 +541,7 @@ class BPlusTree:
             idx = 0
             while idx < len(findNode.keys):
                 if lowerBound <= findNode.keys[idx] <= upperBound:
-                    print(f"{findNode.keys[idx]}, {findNode.values[idx]}")
+                    print(f"{findNode.keys[idx]}, {findNode.values[idx].strip('\'\'')}")
                 idx += 1
             findNode = findNode.r
 
@@ -724,7 +730,7 @@ def main():
                 key, value = line.strip().split(',')
                 tree.insert(int(key), value)
 
-        tree.print_tree(tree.root, 0)
+        #tree.print_tree(tree.root, 0)
         tree.save_to_file(index_file, append = True)
 
     # search 명령
@@ -737,10 +743,8 @@ def main():
 
         if tree is None:
             print("Empty Tree")
-
-        result = tree.search(search_key)
-
-        if result is None:
+        
+        if tree.search(search_key) is None:
             print("NOT FOUND")
             return
 
@@ -780,14 +784,10 @@ def main():
             tree.delete(key)
             print(f"Deleted key: {key}")
 
-        tree.print_tree(tree.root, 0)
+        #tree.print_tree(tree.root, 0)
 
         # 인덱스 파일도 수정
 
 
 if __name__ == "__main__":
     main()
-
-
-# root일 때 parent가 None이 아니라 children을 []로 가지는 노드로 뜨는거 고치기.
-# node마다 tree를 찾을 수 있도록 해야할듯
