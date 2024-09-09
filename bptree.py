@@ -141,7 +141,7 @@ class InternalNode(Node):
             while not findNode.isLeaf:
                 findNode = findNode.r
 
-            leftMax = findNode.keys[-1]
+            leftMax = findNode.keys[len(findNode.keys) - 1]
             self.keys[idx] = leftMax
   
     def merge(self, idx):
@@ -155,6 +155,7 @@ class InternalNode(Node):
             leftSiblingNode.keys.append(parentNode.keys[idx - 1])
             leftSiblingNode.keys.extend(self.keys)
             # children도 병합
+            leftSiblingNode.children.append(leftSiblingNode.r)
             leftSiblingNode.children.extend(self.children)
 
             # 현재 노드가 rightmost child가 아닌 경우
@@ -162,6 +163,17 @@ class InternalNode(Node):
                 # 부모 노드에서 키와 자식 삭제
                 del self.parent.keys[idx]
                 del self.parent.children[idx]
+
+            # 현재 노드가 rightmost child인 경우 병합된 왼쪽 노드를 rightmost child로 설정한다.
+            elif idx == len(parentNode.children):
+                del parentNode.keys[idx - 1]
+                del parentNode.children[idx - 1]
+                parentNode.r = leftSiblingNode
+
+            # 왼쪽 노드로 합쳐졌으므로 자식들의 parent를 leftSibling으로 갱신
+            for child in self.children:
+                child.parent = leftSiblingNode
+            self.r.parent = leftSiblingNode
 
             # 현재 노드가 rightmost child가 아닌 경우 left sibling의 r 포인터를 갱신
             if self.r:
@@ -172,6 +184,11 @@ class InternalNode(Node):
                 # 원래 leftSiblingNode가 children 배열의 마지막에 존재했는데, leftSiblingNode가 병합으로 인해 rightmost children이 되었으므로 children배열에서 제거한다.
                 parentNode.children.pop()
                 leftSiblingNode.r = None
+
+            if len(self.parent.children) == 0:
+                self.parent = None
+                leftSiblingNode.parent = None
+                return leftSiblingNode
             
         # leftmost child인 경우 right sibling과 병합
         else:
@@ -298,8 +315,6 @@ class LeafNode(Node):
         return None
     
     def delete(self, key, internalFlag): # 삭제할 키, 삭제할 키가 internal node에도 존재하는지 여부를 나타내는 flag
-        if key == 93:
-            print("FFF")
         # 노드 내에서 삭제할 키가 몇 번째 인덱스에 존재하는지 찾고 지운다.
         idx = 0
         while idx < len(self.keys):
@@ -325,6 +340,8 @@ class LeafNode(Node):
             parentNode = self.parent
             # 삭제할 키가 존재하는 노드가 parent의 몇 번째 자식인지 찾는다.
             deleteNodeIdx = 0
+            if key == 62:
+                print('here')
             while deleteNodeIdx < len(parentNode.keys):
                 if parentNode.children[deleteNodeIdx] == self:
                     break
@@ -391,14 +408,19 @@ class LeafNode(Node):
             self.values = leftSiblingNode.values + self.values
 
             # 왼쪽 노드의 부모 key를 삭제했을 때 부모 노드의 key 개수가 부족해진다면 merge
-            if deleteNodeIdx - 1 == self.parent.minKeys:
-                parentNode.merge(deleteNodeIdx - 1)
+            #if deleteNodeIdx - 1 == self.parent.minKeys:
+            #    parentNode.merge(deleteNodeIdx - 1)
 
             # 부족해지지 않는 경우
             # 왼쪽 노드의 부모 key를 삭제한다.
-            else: 
-                del parentNode.keys[deleteNodeIdx - 1]
-                del parentNode.children[deleteNodeIdx - 1]
+            #else: 
+            del parentNode.keys[deleteNodeIdx - 1]
+            del parentNode.children[deleteNodeIdx - 1]
+
+            if len(parentNode.keys) == 0 and parentNode.parent is None:
+                self.parent = None
+                # 새로운 루트를 리턴한다.
+                return self
             
         # leftmost node인 경우 right sibling과 병합
         else: 
@@ -428,7 +450,8 @@ class LeafNode(Node):
             while parentIdx < len(parentNode.parent.children) and parentNode.parent.children[parentIdx] != parentNode:
                 parentIdx += 1
             
-            parentNode.merge(parentIdx)  
+            newRoot = parentNode.merge(parentIdx)  
+            return newRoot
 
         return None
 
