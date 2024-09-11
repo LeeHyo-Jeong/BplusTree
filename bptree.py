@@ -1,5 +1,8 @@
 import argparse
 
+find_route = [] # search시 leaf까지 내려가는데 통과한 노드의 키들을 담는 배열
+val = 0       # search를 통해 찾은 key에 대응하는 value를 담는 변수
+
 class Node:
     # 클래스 내에서 전역적으로 사용되는 카운터
     # 노드가 몇 개 생성되었는지를 나타낸다.
@@ -62,6 +65,7 @@ class InternalNode(Node):
     def split(self):
         midIdx = len(self.keys) // 2
         midKey = self.keys[midIdx] # 가운데 키는 부모 노드로 승천
+
         
         # 가운데 키를 기준으로 노드를 좌우 분할
         # 새로운 노드로 기존 노드의 오른쪽 절반을 이동
@@ -151,13 +155,27 @@ class InternalNode(Node):
         # leftmost child가 아닌 경우 left sibling과 병합
         if idx > 0:
             leftSiblingNode = parentNode.children[idx - 1]
-            # 부모 key를 왼쪽 형제로 가져오고 현재 노드의 키와 병합
+            # 부모 키를 가져오고 병합
             leftSiblingNode.keys.append(parentNode.keys[idx - 1])
             leftSiblingNode.keys.extend(self.keys)
             # children도 병합
             leftSiblingNode.children.append(leftSiblingNode.r)
             leftSiblingNode.children.extend(self.children)
 
+            if parentNode.keys[idx - 1] == 845:
+                print("-----")
+
+            # 왼쪽 노드를 가리키는 부모 키 제거
+            del parentNode.keys[idx - 1]
+            if idx < len(parentNode.children):
+                # 왼쪽 노드로 합쳐졌으므로 현재 키 제거
+                del parentNode.children[idx]
+
+            # 현재 노드가 rightmost child인 경우 왼쪽 노드를 새로운 rightmost child로 설정한다.
+            elif idx == len(parentNode.children):
+                parentNode.r = leftSiblingNode
+
+            '''
             # 현재 노드가 rightmost child가 아닌 경우
             if idx < len(parentNode.children):
                 # 부모 노드에서 키와 자식 삭제
@@ -169,14 +187,15 @@ class InternalNode(Node):
                 del parentNode.keys[idx - 1]
                 del parentNode.children[idx - 1]
                 parentNode.r = leftSiblingNode
+            '''
 
             # 왼쪽 노드로 합쳐졌으므로 자식들의 parent를 leftSibling으로 갱신
             for child in self.children:
                 child.parent = leftSiblingNode
-            self.r.parent = leftSiblingNode
 
             # 현재 노드가 rightmost child가 아닌 경우 left sibling의 r 포인터를 갱신
             if self.r:
+                self.r.parent = leftSiblingNode
                 leftSiblingNode.r = self.r
             # 현재 노드가 rightmost child인 경우 부모 노드의 r 포인터 갱신
             else:
@@ -184,6 +203,13 @@ class InternalNode(Node):
                 # 원래 leftSiblingNode가 children 배열의 마지막에 존재했는데, leftSiblingNode가 병합으로 인해 rightmost children이 되었으므로 children배열에서 제거한다.
                 parentNode.children.pop()
                 leftSiblingNode.r = None
+
+            # 병합 후 노드가 넘치면 split
+            if len(leftSiblingNode.keys) > leftSiblingNode.maxKeys:
+                leftSiblingNode.split()
+            
+            if leftSiblingNode.parent is None:
+                return leftSiblingNode
 
             if len(self.parent.children) == 0:
                 self.parent = None
@@ -209,6 +235,7 @@ class InternalNode(Node):
             # 합쳐진 노드의 r을 원래 rightSiblingNode의 r로 설정
             if rightSiblingNode.r:
                 self.r = rightSiblingNode.r
+                rightSiblingNode.r.parent = self
             else:
                 self.r = None
 
@@ -221,6 +248,13 @@ class InternalNode(Node):
                 self.parent.r = self
                 self.parent.children.pop()
 
+            # 병합 후 노드가 넘치면 split
+            if len(self.keys) > self.maxKeys:
+                self.split()
+
+            if self.parent is None:
+                return self
+
             if len(self.parent.children) == 0:
                 self.parent = None
                 # 새로운 루트인 self를 리턴
@@ -230,10 +264,6 @@ class InternalNode(Node):
         if len(parentNode.keys) < parentNode.minKeys and parentNode.parent is not None:
             parentIdx = parentNode.parent.children.index(parentNode)
             parentNode.merge(parentIdx)
-
-        # 루트 노드가 비었으면 트리의 루트를 갱신
-
-
 
 class LeafNode(Node):
     def __init__(self, b):
@@ -247,6 +277,10 @@ class LeafNode(Node):
         # 노드 내에 키를 삽입하기 위한 적절한 위치를 찾는다.
         idx = 0
         while idx < len(self.keys) and key > self.keys[idx]:
+            # 중복 키를 방지한다.
+            if key == self.keys[idx]:
+                print("Duplicated keys are not allowed")
+                return
             idx += 1
 
         self.keys.insert(idx, key)
@@ -330,8 +364,6 @@ class LeafNode(Node):
         if self.parent is None:
             return
         
-        if key == 742:
-            print("HERE")
         # 삭제 후 키가 최소 키 개수보다 많다면 종료한다.
         if len(self.keys) >= self.minKeys:
             # 삭제 후 키가 최소 키 개수보다 많아도 internal node에 그 키가 존재하면 internal node에서도 삭제 해야한다.
@@ -344,8 +376,6 @@ class LeafNode(Node):
             parentNode = self.parent
             # 삭제할 키가 존재하는 노드가 parent의 몇 번째 자식인지 찾는다.
             deleteNodeIdx = 0
-            if key == 62:
-                print('here')
             while deleteNodeIdx < len(parentNode.keys):
                 if parentNode.children[deleteNodeIdx] == self:
                     break
@@ -365,6 +395,8 @@ class LeafNode(Node):
                 
             # left sibling으로부터 키를 분배받을 수 없는 경우 right sibling으로부터 분배받을 수 있는지 확인한다.
             # 삭제할 키가 존재하는 노드가 rightmost child가 아닌 경우
+            if key == 1:
+                print("FFF")
             if deleteNodeIdx < len(parentNode.children):
                 # right sibling의 키 개수를 비교한다.
                 rightSiblingNode = self.r
@@ -411,6 +443,9 @@ class LeafNode(Node):
             self.keys = leftSiblingNode.keys + self.keys
             self.values = leftSiblingNode.values + self.values
 
+            if deleteNodeIdx == len(parentNode.keys):
+                parentNode.r = self
+
             # 왼쪽 노드의 부모 key를 삭제했을 때 부모 노드의 key 개수가 부족해진다면 merge
             #if deleteNodeIdx - 1 == self.parent.minKeys:
             #    parentNode.merge(deleteNodeIdx - 1)
@@ -420,6 +455,7 @@ class LeafNode(Node):
             #else: 
             del parentNode.keys[deleteNodeIdx - 1]
             del parentNode.children[deleteNodeIdx - 1]
+
 
             if len(parentNode.keys) == 0 and parentNode.parent is None:
                 self.parent = None
@@ -432,12 +468,11 @@ class LeafNode(Node):
             rightSiblingNode = self.r
             self.keys = self.keys + rightSiblingNode.keys
             self.values = self.values + rightSiblingNode.values
-            #self.parent = rightSiblingNode.parent
             if deleteNodeIdx + 1 < len(self.parent.children):
                 parentNode.children[deleteNodeIdx + 1] = self
             else:
                 self.parent.r = self
-            self.r = rightSiblingNode.r # 얘 필요없는듯
+            self.r = rightSiblingNode.r
 
             del parentNode.keys[deleteNodeIdx]
             del parentNode.children[deleteNodeIdx]
@@ -459,7 +494,6 @@ class LeafNode(Node):
 
         return None
 
-
 class BPlusTree:
     def __init__(self, b):
         self.root = LeafNode(b)
@@ -475,6 +509,9 @@ class BPlusTree:
                 self.root = self.root.parent
 
     def search(self, key):
+        global find_route
+        global val
+        find_route = []
         findNode = self.root
         if findNode is None:
             return None
@@ -483,7 +520,8 @@ class BPlusTree:
 
         # leaf까지 내려간다.
         while findNode is not None and not findNode.isLeaf:
-            print(str(findNode.keys).strip('[]'))
+            # print(str(findNode.keys).strip('[]'))
+            find_route.append(str(findNode.keys).strip('[]'))
             # 타고 내려갈 적절한 child node를 찾는다.
             childIdx = 0
             while childIdx < len(findNode.keys) and key >= findNode.keys[childIdx]:
@@ -500,15 +538,15 @@ class BPlusTree:
                 findNode = findNode.children[childIdx]
         
         # 도달한 leaf node 안에서 해당 키가 존재하는지 찾는다.
-        print(str(findNode.keys).strip('[]')) # 도달한 leaf node의 키 출력
+        find_route.append(str(findNode.keys).strip('[]'))
+        # print(str(findNode.keys).strip('[]')) # 도달한 leaf node의 키 출력
         keyIdx = 0
         while keyIdx < len(findNode.keys):
             if findNode.keys[keyIdx] == key:
                 # 트리 안에 키가 존재하는 경우 그 키에 대응하는 값을 리턴
                 # return findNode.values[keyIdx]
                 # 트리 안에 키가 존재하는 경우 그 키가 존재하는 노드를 리턴
-                result = int(findNode.values[keyIdx].strip('\'\''))
-                print(result)
+                val = (findNode.values[keyIdx].strip('"')).strip("'")
                 return findNode, internalFlag
             keyIdx += 1
         
@@ -546,6 +584,17 @@ class BPlusTree:
             findNode = findNode.r
 
     def delete(self, key):
+        if key == 1:  # 600을 못 찾는다.. 484가 엉뚱한 위치에 잇슴 그래서 search에서 조건문 통과못해서 이상해지는듯 이것도 merge 관련 이슈 예상
+            print("here")
+        '''
+        result = self.search(key)
+        print(result)
+        if result is None:
+            print(f"Given key {key} does not exist in the tree")
+            return 
+        deleteNode, internalFlag = result[0], result[1]
+        '''
+
         deleteNode, internalFlag = self.search(key) # 삭제 할 키가 존재하는 노드와 그 키가 internal node에도 존재하는지 여부
         
         if deleteNode is None:
@@ -560,7 +609,7 @@ class BPlusTree:
     def print_tree(self, node, level):
         indent = "  " * level
         if node.isLeaf:
-            print(f"{indent}LeafNode(keys={node.keys}, values={node.values})")
+            print(f"{indent}LeafNode(keys={node.keys}, values={[v.strip('\'"').strip("'") for v in node.values]})")
             if node.r:
                 print(f"{indent} -> Right sibling: LeafNode(keys={node.r.keys})")
         else:
@@ -692,6 +741,7 @@ def main():
     # deletion 명령어
     parser.add_argument("-d", "--delete", nargs=2, help="Delete all the key-value pairs inside the input data file from the idnex file", metavar=("INDEX_FILE", "DATA_FILE"))
 
+    parser.add_argument("-p", "--print", nargs=1, help="Print index file tree structure", metavar=("INDEX_FILE"))
     args = parser.parse_args()
 
     # 전역 변수로 설정된 노드 크기 b
@@ -735,6 +785,8 @@ def main():
 
     # search 명령
     elif args.search:
+        global find_route
+        global val
         index_file = args.search[0]
         search_key = int(args.search[1])
 
@@ -747,6 +799,10 @@ def main():
         if tree.search(search_key) is None:
             print("NOT FOUND")
             return
+        
+        for keys in find_route:
+            print(keys)
+        print(val)
 
     # range search 명령
     elif args.range_search:
@@ -784,10 +840,32 @@ def main():
             tree.delete(key)
             print(f"Deleted key: {key}")
 
-        #tree.print_tree(tree.root, 0)
+        # index file에 변경된 트리를 반영한다.
+        # index file의 첫 번째 줄에 노드 사이즈를 남긴다.
+        node_size = 0
+        with open(index_file, 'r') as f:
+            node_size = int(f.readline().strip())
+        with open(index_file, 'w') as f:
+            f.write(str(node_size))
+            f.write('\n')
+        # 두 번째 줄부터 새롭게 바뀐 트리를 반영한다.
+        tree.save_to_file(index_file, append=True)
 
-        # 인덱스 파일도 수정
+    elif args.print:
+        index_file = args.print[0]
 
+        tree = BPlusTree(0)
+        tree = tree.load_from_file(index_file)
+        tree.print_tree(tree.root, 0)
 
 if __name__ == "__main__":
     main()
+
+
+'''
+남은 할 일
+1. 예외처리 (없는 키 삭제하려 하면 에러 나는거 고치기)
+2. 출력 형식 과제 명세에 맞추기
+3. 최적화
+4. 위키 쓰기
+'''
