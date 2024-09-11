@@ -584,16 +584,11 @@ class BPlusTree:
             findNode = findNode.r
 
     def delete(self, key):
-        if key == 1:  # 600을 못 찾는다.. 484가 엉뚱한 위치에 잇슴 그래서 search에서 조건문 통과못해서 이상해지는듯 이것도 merge 관련 이슈 예상
-            print("here")
-        '''
         result = self.search(key)
-        print(result)
         if result is None:
             print(f"Given key {key} does not exist in the tree")
             return 
         deleteNode, internalFlag = result[0], result[1]
-        '''
 
         deleteNode, internalFlag = self.search(key) # 삭제 할 키가 존재하는 노드와 그 키가 internal node에도 존재하는지 여부
         
@@ -838,7 +833,6 @@ def main():
         
         for key in keys:
             tree.delete(key)
-            print(f"Deleted key: {key}")
 
         # index file에 변경된 트리를 반영한다.
         # index file의 첫 번째 줄에 노드 사이즈를 남긴다.
