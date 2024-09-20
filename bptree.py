@@ -1,5 +1,6 @@
 import argparse
 import math
+import time
 
 find_route = [] # search시 leaf까지 내려가는데 통과한 노드의 키들을 담는 배열
 val = 0       # search를 통해 찾은 key에 대응하는 value를 담는 변수
@@ -707,17 +708,17 @@ def main():
     parser = argparse.ArgumentParser(description="B+ Tree Command Line Interface")
 
     # index file creation 명령어
-    parser.add_argument("-c", "--create", nargs=2, help="Create a new index file", metavar=("INDEX_FILE", "NODE_SIZE"))
+    parser.add_argument("-c", "--create", nargs=2, help="index file 생성", metavar=("INDEX_FILE", "NODE_SIZE"))
     # insertion 명령어
-    parser.add_argument("-i", "--insert", nargs=2, help="Insert data into the index", metavar=("INDEX_FILE", "DATA_FILE"))
+    parser.add_argument("-i", "--insert", nargs=2, help="index file에 data 삽입", metavar=("INDEX_FILE", "DATA_FILE"))
     # search 명령어
-    parser.add_argument("-s", "--search", nargs=2, help="Search a value of a pointer to a record with the key", metavar=("INDEX_FILE", "KEY"))
+    parser.add_argument("-s", "--search", nargs=2, help="해당 key에 대응하는 value를 search", metavar=("INDEX_FILE", "KEY"))
     # range search 명령어
-    parser.add_argument("-r", "--range_search", nargs=3, help="Search the values of pointers to records having the keys within the range provided", metavar=("INDEX_FILE", "START_KEY", "END_KEY"))
+    parser.add_argument("-r", "--range_search", nargs=3, help="주어진 범위 내의 key에 대응하는 value들을 search", metavar=("INDEX_FILE", "START_KEY", "END_KEY"))
     # deletion 명령어
-    parser.add_argument("-d", "--delete", nargs=2, help="Delete all the key-value pairs inside the input data file from the idnex file", metavar=("INDEX_FILE", "DATA_FILE"))
+    parser.add_argument("-d", "--delete", nargs=2, help="data file에 있는 모든 key들을 tree로부터 delete", metavar=("INDEX_FILE", "DATA_FILE"))
     # print tree 명령어
-    parser.add_argument("-p", "--print", nargs=1, help="Print index file tree structure", metavar=("INDEX_FILE"))
+    parser.add_argument("-p", "--print", nargs=1, help="tree structure를 출력", metavar=("INDEX_FILE"))
     args = parser.parse_args()
 
     # 전역 변수로 설정된 노드 크기 b
@@ -737,6 +738,8 @@ def main():
 
     # 데이터 삽입 명령
     elif args.insert:
+        start = time.time()
+
         index_file = args.insert[0]
         data_file = args.insert[1]
         node_size = 0
@@ -756,6 +759,10 @@ def main():
                 tree.insert(int(key), value)
 
         tree.save_to_file(index_file, append = True)
+
+        end = time.time()
+
+        print(f"{end - start:.5f} sec")
 
     # search 명령
     elif args.search:
@@ -833,12 +840,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-'''
-남은 할 일
-1. 예외처리 (없는 키 삭제하려 하면 에러 나는거 고치기)
-2. 출력 형식 과제 명세에 맞추기
-3. 최적화
-4. 위키 쓰기
-'''
