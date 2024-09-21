@@ -814,6 +814,10 @@ def main():
         start_key = int(args.range_search[1])
         end_key = int(args.range_search[2])
 
+        if start_key > end_key:
+            print("Upperbound should be larger than lowerbound")
+            return
+
         tree = BPlusTree(0) # 우선 최대 노드 개수를 0으로 설정.
         tree = tree.load_from_file(index_file) # 인덱스 파일에 저장된 정보를 불러와 트리를 구성. 트리의 최대 노드 개수도 재설정 됨
 
