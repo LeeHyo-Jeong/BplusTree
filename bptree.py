@@ -53,7 +53,6 @@ class InternalNode(Node):
                 self.children[idx].insert(key, value)
             elif idx == len(self.keys) and self.r is not None:
                 self.r.insert(key, value)
-                
 
         if len(self.keys) > self.maxKeys:
             return self.split()
@@ -75,6 +74,9 @@ class InternalNode(Node):
         newRightNode.children = self.children[midIdx + 1 :] # 오른쪽 절반 키의 자식 노드도 새로운 노드로 이동
         newRightNode.r = self.r # 요거 추가함
         newRightNode.m = len(newRightNode.keys) # 키의 개수 설정
+
+        if newRightNode.keys[0] == 1936:
+            pass
 
         # 기존 노드에는 왼쪽 절반 정보만 남겨둠
         self.keys = self.keys[: midIdx] # 기존 노드에 왼쪽 절반 키만 남겨둠
@@ -132,6 +134,9 @@ class InternalNode(Node):
         return None
     
     def delete(self, key):
+        if self.id == 100006 or self.id == 100005 or self.id == 464:
+            pass
+
         # internal node에 트리에서 지우고자 하고 있는 키가 있다면 left subtree의 최대 키 값으로 교체
         idx = 0
         while self.keys[idx] != key:
@@ -150,6 +155,9 @@ class InternalNode(Node):
             self.keys[idx] = leftMax
   
     def merge(self, idx):
+        #if self.id == 451 or self.id == 270 or self.id == 452:
+        if self.id == 100006 or self.id == 100005 or self.id == 464:
+            pass
         # internal node의 merge 과정
         parentNode = self.parent
 
@@ -157,27 +165,35 @@ class InternalNode(Node):
         if idx > 0:
             leftSiblingNode = parentNode.children[idx - 1]
             # 부모 키를 가져오고 병합
-            leftSiblingNode.keys.append(parentNode.keys[idx - 1])
+            if idx < len(parentNode.children):
+                leftSiblingNode.keys.append(parentNode.keys[idx - 1])
+                # 왼쪽 노드를 가리키는 부모 키 제거
+                del parentNode.keys[idx - 1]
+            else:
+                leftSiblingNode.keys.append(parentNode.keys[len(parentNode.keys) - 1])
+
             leftSiblingNode.keys.extend(self.keys)
             # children도 병합
             leftSiblingNode.children.append(leftSiblingNode.r)
             leftSiblingNode.children.extend(self.children)
 
-            # 왼쪽 노드를 가리키는 부모 키 제거
-            del parentNode.keys[idx - 1]
+
             if idx < len(parentNode.children):
                 # 왼쪽 노드로 합쳐졌으므로 현재 키 제거
                 del parentNode.children[idx]
 
-            # 현재 노드가 rightmost child인 경우 왼쪽 노드를 새로운 rightmost child로 설정한다.
+            # 현재 노드가 rightmost child인 경우
+            # 왼쪽 노드를 children 배열에서 제거하고 왼쪽 노드를 새로운 rightmost child로 설정한다.
             elif idx == len(parentNode.children):
-                parentNode.r = leftSiblingNode
+                parentNode.children.pop()
+                parentNode.keys.pop()
+                parentNode.r = leftSiblingNode 
 
             # 왼쪽 노드로 합쳐졌으므로 자식들의 parent를 leftSibling으로 갱신
             for child in self.children:
                 child.parent = leftSiblingNode
 
-            # 현재 노드가 rightmost child가 아닌 경우 left sibling의 r 포인터를 갱신
+            # 현재 노드의 r 포인터의 부모 노드로 left sibling을 지정
             if self.r:
                 self.r.parent = leftSiblingNode
                 leftSiblingNode.r = self.r
@@ -185,7 +201,7 @@ class InternalNode(Node):
             else:
                 parentNode.r = leftSiblingNode
                 # 원래 leftSiblingNode가 children 배열의 마지막에 존재했는데, leftSiblingNode가 병합으로 인해 rightmost children이 되었으므로 children배열에서 제거한다.
-                parentNode.children.pop()
+                #parentNode.children.pop()
                 leftSiblingNode.r = None
 
             # 병합 후 노드가 넘치면 split
@@ -231,6 +247,10 @@ class InternalNode(Node):
                 del self.parent.r
                 self.parent.r = self
                 self.parent.children.pop()
+
+            for child in self.children:
+                child.parent = self
+            
 
             # 병합 후 노드가 넘치면 split
             if len(self.keys) > self.maxKeys:
@@ -334,6 +354,8 @@ class LeafNode(Node):
         return None
     
     def delete(self, key, internalFlag): # 삭제할 키, 삭제할 키가 internal node에도 존재하는지 여부를 나타내는 flag
+        if self.id == 221 or self.id == 223 or self.id == 224:
+            pass
         # 노드 내에서 삭제할 키가 몇 번째 인덱스에 존재하는지 찾고 지운다.
         idx = 0
         newRoot = None
@@ -414,32 +436,34 @@ class LeafNode(Node):
         leftSiblingNode = None
         rightSiblingNode = None
 
+        if self.id == 223 or self.id == 224:
+            pass
+
         # leftmost child가 아닌 경우 left sibling과 병합
         if deleteNodeIdx > 0:
             # left sibling과 병합하는 경우 왼쪽 노드의 부모 key를 삭제한다.
             leftSiblingNode = parentNode.children[deleteNodeIdx - 1]
 
-            # left sibling이 leftmost children이 아닌 경우 left sibling의 left sibling의 r 포인터를 다시 설정한다.
-            if deleteNodeIdx - 2 > 0:
-                parentNode.children[deleteNodeIdx - 2].r = self
-            self.keys = leftSiblingNode.keys + self.keys
-            self.values = leftSiblingNode.values + self.values
+            leftSiblingNode.keys = leftSiblingNode.keys + self.keys
+            #leftSiblingNode.values.append(str(leftSiblingNode.r))
+            leftSiblingNode.values = leftSiblingNode.values + self.values
+
+            if self.r:
+                leftSiblingNode.r = self.r
 
             if deleteNodeIdx == len(parentNode.keys):
-                parentNode.r = self
+                parentNode.children.pop()
+                parentNode.r = leftSiblingNode
+            else:
+                del parentNode.children[deleteNodeIdx]
 
-            # 부족해지지 않는 경우
-            # 왼쪽 노드의 부모 key를 삭제한다.
-            #else: 
             del parentNode.keys[deleteNodeIdx - 1]
-            del parentNode.children[deleteNodeIdx - 1]
-
-
-            if len(parentNode.keys) == 0 and parentNode.parent is None:
-                self.parent = None
-                # 새로운 루트를 리턴한다.
-                return self
             
+            if len(parentNode.keys) == 0 and parentNode.parent is None:
+                leftSiblingNode.parent = None
+                # 새로운 루트를 리턴한다.
+                return leftSiblingNode
+
         # leftmost node인 경우 right sibling과 병합
         else: 
             # right sibling과 병합하는 경우 지우려는 키가 있는 노드의 부모 key를 삭제한다.
@@ -556,6 +580,8 @@ class BPlusTree:
             idx = 0
             while idx < len(findNode.keys):
                 if lowerBound <= findNode.keys[idx] <= upperBound:
+                    if findNode.keys[idx] == 39:
+                        pass
                     print(f"{findNode.keys[idx]}, {findNode.values[idx].strip('\'\'')}")
                 idx += 1
             if findNode.keys[0] > upperBound:
@@ -563,22 +589,19 @@ class BPlusTree:
             findNode = findNode.r
 
     def delete(self, key):
+        if key == 626:
+            pass
         result = self.search(key)
         if result is None:
-            print(f"Given key {key} does not exist in the tree")
+            #print(f"Given key {key} does not exist in the tree")
             return 
         deleteNode, internalFlag = result[0], result[1]
-
-        deleteNode, internalFlag = self.search(key) # 삭제 할 키가 존재하는 노드와 그 키가 internal node에도 존재하는지 여부
-        
-        if deleteNode is None:
-            print("Given key does not exist in the tree")
-            return
         
         newRoot = deleteNode.delete(key, internalFlag)
         # newRoot의 값이 None이 아닌 경우 루트가 새롭게 바뀌었다는 뜻이므로 트리의 루트를 갱신한다.
         if newRoot:
             self.root = newRoot
+
 
     def print_tree(self, node, level):
         indent = "  " * level
@@ -802,6 +825,7 @@ def main():
 
     # deletion 명령
     elif args.delete:
+        start = time.time()
         index_file = args.delete[0]
         data_file = args.delete[1]
 
@@ -830,6 +854,9 @@ def main():
             f.write('\n')
         # 두 번째 줄부터 새롭게 바뀐 트리를 반영한다.
         tree.save_to_file(index_file, append=True)
+
+        end = time.time()
+        print(f"{end - start:.5f} sec")
 
     elif args.print:
         index_file = args.print[0]
