@@ -266,7 +266,11 @@ class InternalNode(Node):
 
         # 부모 노드가 루트 노드가 아닌 경우 부모 노드에 키가 부족해진다면 재귀적으로 병합 진행
         if len(parentNode.keys) < parentNode.minKeys and parentNode.parent is not None:
-            parentIdx = parentNode.parent.children.index(parentNode)
+            grandParentNode = parentNode.parent
+            if grandParentNode.r == parentNode:
+                parentIdx = len(grandParentNode.children)
+            else:
+                parentIdx = grandParentNode.children.index(parentNode)
             parentNode.merge(parentIdx)
 
 class LeafNode(Node):
