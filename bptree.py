@@ -1,6 +1,5 @@
 import argparse
 import math
-import time
 
 find_route = [] # search시 leaf까지 내려가는데 통과한 노드의 키들을 담는 배열
 val = 0       # search를 통해 찾은 key에 대응하는 value를 담는 변수
@@ -75,9 +74,6 @@ class InternalNode(Node):
         newRightNode.r = self.r # 요거 추가함
         newRightNode.m = len(newRightNode.keys) # 키의 개수 설정
 
-        if newRightNode.keys[0] == 1936:
-            pass
-
         # 기존 노드에는 왼쪽 절반 정보만 남겨둠
         self.keys = self.keys[: midIdx] # 기존 노드에 왼쪽 절반 키만 남겨둠
         self.children = self.children[: midIdx + 1] # 기존 노드의 왼쪽 절반 키의 자식 노드만 남겨둠
@@ -134,9 +130,6 @@ class InternalNode(Node):
         return None
     
     def delete(self, key):
-        if self.id == 100006 or self.id == 100005 or self.id == 464:
-            pass
-
         # internal node에 트리에서 지우고자 하고 있는 키가 있다면 left subtree의 최대 키 값으로 교체
         idx = 0
         while self.keys[idx] != key:
@@ -155,9 +148,6 @@ class InternalNode(Node):
             self.keys[idx] = leftMax
   
     def merge(self, idx):
-        #if self.id == 451 or self.id == 270 or self.id == 452:
-        if self.id == 100006 or self.id == 100005 or self.id == 464:
-            pass
         # internal node의 merge 과정
         parentNode = self.parent
 
@@ -358,8 +348,6 @@ class LeafNode(Node):
         return None
     
     def delete(self, key, internalFlag): # 삭제할 키, 삭제할 키가 internal node에도 존재하는지 여부를 나타내는 flag
-        if self.id == 221 or self.id == 223 or self.id == 224:
-            pass
         # 노드 내에서 삭제할 키가 몇 번째 인덱스에 존재하는지 찾고 지운다.
         idx = 0
         newRoot = None
@@ -440,29 +428,34 @@ class LeafNode(Node):
         leftSiblingNode = None
         rightSiblingNode = None
 
-        if self.id == 223 or self.id == 224:
-            pass
-
         # leftmost child가 아닌 경우 left sibling과 병합
         if deleteNodeIdx > 0:
             # left sibling과 병합하는 경우 왼쪽 노드의 부모 key를 삭제한다.
             leftSiblingNode = parentNode.children[deleteNodeIdx - 1]
 
+            # left sibling에 key와 value를 합친다.
             leftSiblingNode.keys = leftSiblingNode.keys + self.keys
-            #leftSiblingNode.values.append(str(leftSiblingNode.r))
             leftSiblingNode.values = leftSiblingNode.values + self.values
 
+            # left sibling의 right sibling pointer를 갱신한다.
             if self.r:
                 leftSiblingNode.r = self.r
 
+            # 현재 노드가 부모 노드의 rightmost child라면
+            # left sibling과 병합한 후 left sibling이 새로운 rightmost child가 된다.
+            # left sibling을 children 배열에서 제거하고 rightmost child로 설정해준다.
             if deleteNodeIdx == len(parentNode.keys):
                 parentNode.children.pop()
                 parentNode.r = leftSiblingNode
+            # 현재 노드가 부모 노드의 rightmost child가 아니라면
+            # left sibling과 병합되었으므로 현재 노드를 부모 노드의 children 배열에서 삭제한다.
             else:
                 del parentNode.children[deleteNodeIdx]
 
+            # 현재 노드와 left sibling 사이에 해당하는 부모 노드의 key를 삭제한다.
             del parentNode.keys[deleteNodeIdx - 1]
             
+            # 병합 후 부모 노드가 빈다면 병합된 노드가 트리의 새로운 루트 노드가 된다.
             if len(parentNode.keys) == 0 and parentNode.parent is None:
                 leftSiblingNode.parent = None
                 # 새로운 루트를 리턴한다.
@@ -584,8 +577,6 @@ class BPlusTree:
             idx = 0
             while idx < len(findNode.keys):
                 if lowerBound <= findNode.keys[idx] <= upperBound:
-                    if findNode.keys[idx] == 39:
-                        pass
                     print(f"{findNode.keys[idx]}, {findNode.values[idx].strip('\'\'')}")
                 idx += 1
             if findNode.keys[0] > upperBound:
@@ -593,8 +584,6 @@ class BPlusTree:
             findNode = findNode.r
 
     def delete(self, key):
-        if key == 626:
-            pass
         result = self.search(key)
         if result is None:
             #print(f"Given key {key} does not exist in the tree")
@@ -765,8 +754,6 @@ def main():
 
     # 데이터 삽입 명령
     elif args.insert:
-        start = time.time()
-
         index_file = args.insert[0]
         data_file = args.insert[1]
         node_size = 0
@@ -786,10 +773,6 @@ def main():
                 tree.insert(int(key), value)
 
         tree.save_to_file(index_file, append = True)
-
-        end = time.time()
-
-        print(f"{end - start:.5f} sec")
 
     # search 명령
     elif args.search:
@@ -833,7 +816,6 @@ def main():
 
     # deletion 명령
     elif args.delete:
-        start = time.time()
         index_file = args.delete[0]
         data_file = args.delete[1]
 
@@ -863,8 +845,6 @@ def main():
         # 두 번째 줄부터 새롭게 바뀐 트리를 반영한다.
         tree.save_to_file(index_file, append=True)
 
-        end = time.time()
-        print(f"{end - start:.5f} sec")
 
     elif args.print:
         index_file = args.print[0]
